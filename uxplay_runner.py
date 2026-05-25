@@ -8,12 +8,16 @@ Aqui simplemente:
  - localizamos el binario `uxplay.exe`
  - lo arrancamos con las opciones que queramos
  - capturamos su stdout/stderr en tiempo real y lo enviamos a la GUI
+ - vigilamos las lineas de log para saber cuando hay un stream activo
+   (se usa para habilitar el boton de pantalla completa y para mantener
+    el monitor despierto)
  - lo detenemos limpiamente cuando se cierra la app
 """
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -22,6 +26,22 @@ import threading
 from typing import Callable, Optional
 
 import config
+
+
+# Lineas de UxPlay que indican que un iPhone se ha conectado / desconectado.
+# Las elegimos compiladas en regex para que sean case-insensitive y robustas
+# frente a cambios menores entre versiones (p.ej. "Accepting Client" cambio
+# a "Accepting client" en alguna release).
+_STREAM_START_RE = re.compile(
+    r"(accepting\s+client|client_connected|connection.*established|"
+    r"video\s+stream\s+connected|started\s+receiver)",
+    re.IGNORECASE,
+)
+_STREAM_STOP_RE = re.compile(
+    r"(client\s+device\s+disconnected|client_disconnected|teardown|"
+    r"connection\s+closed|stopping\s+receiver)",
+    re.IGNORECASE,
+)
 
 
 class UxPlayNotFound(RuntimeError):
@@ -54,14 +74,32 @@ def find_uxplay() -> Optional[str]:
 class UxPlayRunner:
     """Envuelve un subprocess.Popen de uxplay.exe."""
 
-    def __init__(self, on_event: Optional[Callable[[str], None]] = None):
+    def __init__(
+        self,
+        on_event: Optional[Callable[[str], None]] = None,
+        on_stream_state: Optional[Callable[[bool], None]] = None,
+    ):
         self.on_event = on_event or (lambda _msg: None)
+        # Callback que se dispara cuando el estado del stream cambia.
+        # True  -> el iPhone esta efectivamente duplicando pantalla.
+        # False -> aun no hay stream o ya termino.
+        self.on_stream_state = on_stream_state or (lambda _active: None)
         self._proc: Optional[subprocess.Popen] = None
         self._reader: Optional[threading.Thread] = None
+        self._streaming: bool = False
 
     # ------------------------------------------------------------------ API --
     def is_running(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
+
+    def is_streaming(self) -> bool:
+        return self._streaming
+
+    @property
+    def pid(self) -> Optional[int]:
+        if self._proc is None:
+            return None
+        return self._proc.pid
 
     def start(self) -> None:
         if self.is_running():
@@ -130,9 +168,19 @@ class UxPlayRunner:
         finally:
             self._proc = None
             self._reader = None
+            self._set_streaming(False)
             self.on_event("[Stop] UxPlay detenido")
 
     # --------------------------------------------------------------- interno --
+    def _set_streaming(self, active: bool) -> None:
+        if active == self._streaming:
+            return
+        self._streaming = active
+        try:
+            self.on_stream_state(active)
+        except Exception as e:
+            self.on_event(f"[!] on_stream_state callback fallo: {e}")
+
     def _pump_output(self) -> None:
         assert self._proc is not None
         stream = self._proc.stdout
@@ -140,9 +188,18 @@ class UxPlayRunner:
             return
         for line in stream:
             line = line.rstrip()
-            if line:
-                self.on_event(line)
+            if not line:
+                continue
+            self.on_event(line)
+            # Estado del stream basado en patrones de log de UxPlay.
+            # Si vemos los dos (start y stop) en la misma linea (raro),
+            # el ultimo gana.
+            if _STREAM_START_RE.search(line):
+                self._set_streaming(True)
+            if _STREAM_STOP_RE.search(line):
+                self._set_streaming(False)
         # Cuando el stream se cierra, normalmente es que UxPlay termino
+        self._set_streaming(False)
         rc = self._proc.poll() if self._proc else None
         if rc is not None and rc != 0:
             self.on_event(f"[!] UxPlay salio con codigo {rc}")

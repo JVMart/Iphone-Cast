@@ -18,6 +18,7 @@ from tkinter import ttk, scrolledtext, messagebox
 
 import config
 from uxplay_runner import UxPlayRunner, find_uxplay, UxPlayNotFound
+from fullscreen import FullscreenManager
 
 
 logging.basicConfig(
@@ -37,6 +38,18 @@ class App:
         self.runner = UxPlayRunner(on_event=self._enqueue)
 
         self._build_ui()
+
+        # Pantalla completa + keep-awake. Conectar despues de _build_ui
+        # porque necesita el boton ya creado para habilitarlo/deshabilitarlo.
+        self.fs = FullscreenManager(
+            self.root,
+            get_pid=lambda: self.runner.pid,
+            log=self._enqueue,
+        )
+        self.fs.on_can_fullscreen_change = self._set_fullscreen_button_state
+        self.runner.on_stream_state = self.fs.on_stream_state_changed
+        self.btn_fs.config(command=self.fs.toggle)
+
         self._tick()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._check_uxplay_installed()
@@ -71,6 +84,12 @@ class App:
         self.btn_start.pack(side="left")
         self.btn_stop = ttk.Button(btns, text="[Stop]  Parar", command=self.stop, state="disabled")
         self.btn_stop.pack(side="left", padx=(8, 0))
+        # El boton de fullscreen arranca deshabilitado; se activa cuando
+        # UxPlay confirma que el iPhone esta duplicando.
+        self.btn_fs = ttk.Button(
+            btns, text="Pantalla completa", state="disabled"
+        )
+        self.btn_fs.pack(side="left", padx=(8, 0))
 
         self.lbl_status = ttk.Label(btns, text="Detenido", foreground="#a00")
         self.lbl_status.pack(side="right")
@@ -115,14 +134,20 @@ class App:
 
     def stop(self):
         try:
+            self.fs.shutdown()
             self.runner.stop()
         finally:
             self.btn_start.config(state="normal" if find_uxplay() else "disabled")
             self.btn_stop.config(state="disabled")
+            self.btn_fs.config(state="disabled")
             self.lbl_status.config(text="Detenido", foreground="#a00")
+
+    def _set_fullscreen_button_state(self, enabled: bool) -> None:
+        self.btn_fs.config(state="normal" if enabled else "disabled")
 
     def _on_close(self):
         try:
+            self.fs.shutdown()
             self.stop()
         finally:
             self.root.destroy()

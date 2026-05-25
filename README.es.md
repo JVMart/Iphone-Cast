@@ -165,8 +165,11 @@ python main.py
 2. En el iPhone: desliza desde la esquina superior derecha para abrir **Centro de Control**.
 3. Pulsa **Duplicar pantalla** (icono de dos rectangulos solapados).
 4. Selecciona **PC-Cast** de la lista.
-5. La pantalla del iPhone aparecera en una ventana del PC (fullscreen por defecto). Abre tu app de peliculas y reproduce.
-6. Para terminar: en el iPhone, vuelve a Centro de Control -> Duplicar pantalla -> **Detener duplicacion**. Luego pulsa **Parar** en el PC.
+5. La pantalla del iPhone aparecera en una ventana del PC. Abre tu app de peliculas y reproduce.
+6. (Opcional) Pulsa **Pantalla completa** para ver solo el mirror, sin bordes ni decoraciones. Aparece un boton flotante `[X Salir]` arriba a la derecha que se desvanece tras 3 segundos sin actividad de raton/teclado. Pulsa **Esc** o el boton flotante para salir.
+7. Para terminar: en el iPhone, vuelve a Centro de Control -> Duplicar pantalla -> **Detener duplicacion**. Luego pulsa **Parar** en el PC.
+
+Mientras el iPhone esta duplicando, el monitor del PC se mantiene despierto (`SetThreadExecutionState`) para que Windows no atenue ni apague la pantalla a mitad de una pelicula. El bloqueo se libera automaticamente al desconectar el iPhone o pulsar **Parar**.
 
 ## Configuracion (`config.py`)
 
@@ -217,6 +220,7 @@ Iphone-cast/
 |   +-- build_uxplay.sh # Compilacion de UxPlay (lo invoca install.ps1)
 |-- main.py             # GUI Tkinter (launcher)
 |-- uxplay_runner.py    # Wrapper subprocess de uxplay.exe
+|-- fullscreen.py       # Pantalla completa Win32, overlay, hook Esc, keep-awake
 |-- config.py           # Nombre del servicio, ruta a UxPlay, flags extra
 |-- launcher.c          # Fuente del wrapper .exe (Win32, compilable con gcc)
 |-- launcher.rc         # Recurso que incrusta el icono en el .exe

@@ -165,8 +165,11 @@ python main.py
 2. On the iPhone: swipe down from the top-right corner to open **Control Center**.
 3. Tap **Screen Mirroring** (two overlapping rectangles icon).
 4. Pick **PC-Cast** from the list.
-5. Your iPhone screen shows up in a window on the PC (fullscreen by default). Open your movie app and play.
-6. To stop: on the iPhone, go back to Control Center -> Screen Mirroring -> **Stop Mirroring**. Then click **Parar** (Stop) on the PC.
+5. Your iPhone screen shows up in a window on the PC. Open your movie app and play.
+6. (Optional) Click **Pantalla completa** to get a borderless fullscreen view of just the mirror. A small `[X Salir]` overlay appears in the top-right corner and fades out after 3 seconds of no mouse/keyboard activity. Press **Esc** or click the overlay button to exit.
+7. To stop: on the iPhone, go back to Control Center -> Screen Mirroring -> **Stop Mirroring**. Then click **Parar** (Stop) on the PC.
+
+While the iPhone is actively mirroring, the PC display is kept awake (`SetThreadExecutionState`) so Windows doesn't dim or sleep mid-movie. The lock releases automatically when the iPhone disconnects or you stop the receiver.
 
 ## Configuration (`config.py`)
 
@@ -217,6 +220,7 @@ Iphone-cast/
 |   +-- build_uxplay.sh # UxPlay build (invoked by install.ps1)
 |-- main.py             # Tkinter GUI (launcher)
 |-- uxplay_runner.py    # subprocess wrapper for uxplay.exe
+|-- fullscreen.py       # Win32 fullscreen, overlay, Esc hook, keep-awake
 |-- config.py           # Service name, path to UxPlay, extra flags
 |-- launcher.c          # Wrapper .exe source (Win32, gcc-compilable)
 |-- launcher.rc         # Resource embedding the icon into the .exe
