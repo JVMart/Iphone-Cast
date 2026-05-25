@@ -127,11 +127,19 @@ class UxPlayRunner:
 
         self.on_event(f"[Play] Lanzando: {' '.join(args)}")
 
-        # En Windows, CREATE_NEW_PROCESS_GROUP permite enviarle CTRL_BREAK
-        # para terminarlo limpiamente.
+        # En Windows:
+        #  - CREATE_NEW_PROCESS_GROUP permite enviarle CTRL_BREAK para
+        #    terminarlo limpiamente.
+        #  - CREATE_NO_WINDOW evita que Windows abra una consola para
+        #    uxplay.exe (es una app de consola; si pythonw.exe no tiene
+        #    consola, el SO le asignaria una nueva como ventana negra).
+        #    Los pipes stdout/stderr siguen funcionando normalmente.
         creationflags = 0
         if sys.platform.startswith("win"):
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            creationflags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.CREATE_NO_WINDOW
+            )
 
         self._proc = subprocess.Popen(
             args,
