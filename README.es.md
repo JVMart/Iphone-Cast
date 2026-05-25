@@ -225,12 +225,20 @@ Iphone-cast/
 |-- launcher.c          # Fuente del wrapper .exe (Win32, compilable con gcc)
 |-- launcher.rc         # Recurso que incrusta el icono en el .exe
 |-- icon.svg            # Diseno vectorial del icono (estilo AirPlay)
+|-- LICENSE             # MIT (nuestro codigo)
+|-- THIRD_PARTY_LICENSES.md  # Componentes GPL/LGPL/MIT en el bundle
 |-- PRIVACY.md          # Politica de privacidad (para Microsoft Partner Center)
 |-- README.md           # README en ingles (por defecto)
 +-- README.es.md        # Este archivo
 ```
 
 `Iphone-Cast.exe`, `Iphone-Cast.ico`, `.venv/` y `launcher_res.o` son artefactos que genera `install.ps1`; estan en `.gitignore` para no contaminar el repo publico.
+
+## Licencia
+
+El codigo propio del proyecto (`main.py`, `uxplay_runner.py`, `fullscreen.py`, `i18n.py`, `user_settings.py`, `config.py`, `launcher.c`, `install.ps1`, `scripts/`, `icon.svg`) se publica bajo **licencia MIT** — ver [`LICENSE`](LICENSE).
+
+El **instalador final** (bundle) redistribuye software de terceros (UxPlay bajo GPL v3, GStreamer bajo LGPL v2.1, y varias librerias de codecs con licencias permisivas). El bundle en su conjunto queda por tanto sujeto a las obligaciones de redistribucion de la GPL v3. La lista completa de componentes, textos de licencia y enlaces al codigo fuente esta en [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
 
 ## Troubleshooting
 
