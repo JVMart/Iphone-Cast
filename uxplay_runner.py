@@ -49,18 +49,41 @@ class UxPlayNotFound(RuntimeError):
     pass
 
 
+def _bundled_root() -> Optional[str]:
+    """Si la app esta en modo "instalador empaquetado", devuelve el dir raiz.
+
+    Modo bundled: existe `bin\\uxplay.exe` junto al .exe que esta corriendo
+    (es el layout que produce installer/build.ps1).
+    """
+    # sys.executable apunta al Iphone-Cast.exe en modo PyInstaller, o a
+    # pythonw.exe en modo source. En ambos casos miramos su carpeta.
+    candidates = [
+        os.path.dirname(sys.executable),                # PyInstaller / .exe
+        os.path.dirname(os.path.abspath(__file__)),     # ejecutando main.py
+    ]
+    for root in candidates:
+        if os.path.isfile(os.path.join(root, "bin", "uxplay.exe")):
+            return root
+    return None
+
+
 def find_uxplay() -> Optional[str]:
     """Devuelve la ruta a uxplay.exe o None si no se encuentra."""
     # 1) ruta explicita en config
     if config.UXPLAY_PATH and os.path.isfile(config.UXPLAY_PATH):
         return config.UXPLAY_PATH
 
-    # 2) en el PATH
+    # 2) modo bundled: bin/uxplay.exe junto a la app
+    root = _bundled_root()
+    if root:
+        return os.path.join(root, "bin", "uxplay.exe")
+
+    # 3) en el PATH
     found = shutil.which("uxplay") or shutil.which("uxplay.exe")
     if found:
         return found
 
-    # 3) ubicaciones tipicas de MSYS2
+    # 4) ubicaciones tipicas de MSYS2 (instalacion via install.ps1)
     candidates = [
         r"C:\msys64\ucrt64\bin\uxplay.exe",
         r"C:\msys64\mingw64\bin\uxplay.exe",
@@ -138,6 +161,18 @@ class UxPlayRunner:
                 | subprocess.CREATE_NO_WINDOW
             )
 
+        # En modo bundled, decirle a GStreamer donde estan los plugins
+        # (los empacamos en bin/lib/gstreamer-1.0/).
+        proc_env = os.environ.copy()
+        root = _bundled_root()
+        if root:
+            plugin_dir = os.path.join(root, "bin", "lib", "gstreamer-1.0")
+            if os.path.isdir(plugin_dir):
+                proc_env["GST_PLUGIN_PATH"] = plugin_dir
+                # Evitar que GStreamer escanee plugins del sistema (acelera
+                # el arranque y evita choques de versiones).
+                proc_env["GST_PLUGIN_SYSTEM_PATH"] = plugin_dir
+
         self._proc = subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
@@ -145,6 +180,7 @@ class UxPlayRunner:
             text=True,
             bufsize=1,
             creationflags=creationflags,
+            env=proc_env,
         )
 
         # Hilo que lee la salida de UxPlay y la reenvia a la GUI
