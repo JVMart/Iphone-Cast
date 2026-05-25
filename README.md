@@ -225,7 +225,7 @@ Iphone-cast/
 |-- launcher.c          # Wrapper .exe source (Win32, gcc-compilable)
 |-- launcher.rc         # Resource embedding the icon into the .exe
 |-- icon.svg            # Vector design of the icon (AirPlay-style)
-|-- requirements.txt    # (empty - standard library only)
+|-- PRIVACY.md          # Privacy policy (for Microsoft Partner Center)
 |-- README.md           # This file (English)
 +-- README.es.md        # Spanish version
 ```

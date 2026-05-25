@@ -11,7 +11,6 @@ Uso:
 Requiere tener UxPlay instalado (ver README).
 """
 
-import logging
 import queue
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
@@ -19,12 +18,6 @@ from tkinter import ttk, scrolledtext, messagebox
 import config
 from uxplay_runner import UxPlayRunner, find_uxplay, UxPlayNotFound
 from fullscreen import FullscreenManager
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
 
 
 class App:
