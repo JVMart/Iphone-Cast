@@ -1,0 +1,2 @@
+# Esta app solo usa la libreria estandar de Python (tkinter, subprocess, threading).
+# El receptor AirPlay real es UxPlay (binario externo) - instalacion en el README.
