@@ -26,6 +26,7 @@ import threading
 from typing import Callable, Optional
 
 import config
+import i18n
 
 
 # Lineas de UxPlay que indican que un iPhone se ha conectado / desconectado.
@@ -107,11 +108,7 @@ class UxPlayRunner:
 
         exe = find_uxplay()
         if not exe:
-            raise UxPlayNotFound(
-                "No se encontro uxplay.exe.\n"
-                "Instalalo siguiendo el README (seccion 'Instalar UxPlay'),\n"
-                "o pon la ruta exacta en config.UXPLAY_PATH."
-            )
+            raise UxPlayNotFound(i18n.t("err_uxplay_not_found"))
 
         # Construimos los argumentos
         args: list[str] = [exe]
@@ -125,7 +122,7 @@ class UxPlayRunner:
         # extras del usuario (lista de strings)
         args += list(config.UXPLAY_EXTRA_ARGS)
 
-        self.on_event(f"[Play] Lanzando: {' '.join(args)}")
+        self.on_event(i18n.t("log_launching", cmd=" ".join(args)))
 
         # En Windows:
         #  - CREATE_NEW_PROCESS_GROUP permite enviarle CTRL_BREAK para
@@ -154,8 +151,8 @@ class UxPlayRunner:
         self._reader = threading.Thread(target=self._pump_output, daemon=True)
         self._reader.start()
 
-        self.on_event(f"[OK] UxPlay activo. Buscalo en el iPhone como '{config.SERVICE_NAME}'")
-        self.on_event("     Centro de Control -> Duplicar pantalla -> " + config.SERVICE_NAME)
+        self.on_event(i18n.t("log_active", name=config.SERVICE_NAME))
+        self.on_event(i18n.t("log_active_hint", name=config.SERVICE_NAME))
 
     def stop(self) -> None:
         if not self.is_running() or self._proc is None:
@@ -172,12 +169,12 @@ class UxPlayRunner:
                 self._proc.kill()
                 self._proc.wait(timeout=2)
         except Exception as e:
-            self.on_event(f"[!] Error al detener: {e}")
+            self.on_event(i18n.t("log_error_stopping", err=e))
         finally:
             self._proc = None
             self._reader = None
             self._set_streaming(False)
-            self.on_event("[Stop] UxPlay detenido")
+            self.on_event(i18n.t("log_stopped"))
 
     # --------------------------------------------------------------- interno --
     def _set_streaming(self, active: bool) -> None:
@@ -187,7 +184,7 @@ class UxPlayRunner:
         try:
             self.on_stream_state(active)
         except Exception as e:
-            self.on_event(f"[!] on_stream_state callback fallo: {e}")
+            self.on_event(i18n.t("log_callback_fail", err=e))
 
     def _pump_output(self) -> None:
         assert self._proc is not None
@@ -210,4 +207,4 @@ class UxPlayRunner:
         self._set_streaming(False)
         rc = self._proc.poll() if self._proc else None
         if rc is not None and rc != 0:
-            self.on_event(f"[!] UxPlay salio con codigo {rc}")
+            self.on_event(i18n.t("log_exit_code", rc=rc))

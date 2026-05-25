@@ -22,6 +22,8 @@ import tkinter as tk
 from ctypes import wintypes
 from typing import Callable, Optional
 
+import i18n
+
 
 # ---------------------------------------------------------- Win32 plumbing --
 user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -300,7 +302,7 @@ class FullscreenManager:
             return
         pid = self.get_pid()
         if not pid:
-            self.log("[FS] UxPlay no esta corriendo.")
+            self.log(i18n.t("fs_not_running"))
             return
 
         # La ventana de video puede tardar un pelin en aparecer; reintentamos.
@@ -311,7 +313,7 @@ class FullscreenManager:
                 break
             time.sleep(0.1)
         if not hwnd:
-            self.log("[FS] No encontre la ventana de UxPlay. Intentalo de nuevo cuando el iPhone este duplicando.")
+            self.log(i18n.t("fs_no_window"))
             return
 
         # Guardar estado original
@@ -341,7 +343,7 @@ class FullscreenManager:
         self._poll_inactivity()
 
         self._active = True
-        self.log("[FS] Pantalla completa activada. Esc para salir.")
+        self.log(i18n.t("fs_entered"))
 
     def exit_fullscreen(self) -> None:
         if not self._active:
@@ -374,7 +376,7 @@ class FullscreenManager:
         self._saved_style = None
         self._saved_exstyle = None
         self._saved_rect = None
-        self.log("[FS] Pantalla completa desactivada.")
+        self.log(i18n.t("fs_exited"))
 
     # ------------------------------------------------------------ overlay --
     def _build_overlay(self, mon_left: int, mon_top: int, mon_w: int) -> None:
@@ -387,7 +389,7 @@ class FullscreenManager:
 
         btn = tk.Button(
             ov,
-            text="✕  Salir (Esc)",
+            text=i18n.t("fs_overlay_btn"),
             font=("Segoe UI", 11, "bold"),
             bg="#0A84FF",
             fg="white",

@@ -1,5 +1,8 @@
 """Configuracion global de Iphone-Cast (launcher de UxPlay)."""
 
+# Version del producto (se inyecta en la pestana "Ajustes" y en el instalador).
+APP_VERSION = "1.0.0"
+
 # Nombre visible en el menu "Duplicar pantalla" del iPhone.
 SERVICE_NAME = "PC-Cast"
 
