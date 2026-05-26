@@ -30,17 +30,33 @@ import i18n
 
 
 # Lineas de UxPlay que indican que un iPhone se ha conectado / desconectado.
-# Las elegimos compiladas en regex para que sean case-insensitive y robustas
-# frente a cambios menores entre versiones (p.ej. "Accepting Client" cambio
-# a "Accepting client" en alguna release).
+# Calibradas con un log real de UxPlay 1.73.6. Cualquiera de las alternativas
+# de _STREAM_START_RE basta para activar el modo "streaming"; se quedan varios
+# para que la deteccion sobreviva renames menores entre releases.
 _STREAM_START_RE = re.compile(
-    r"(accepting\s+client|client_connected|connection.*established|"
-    r"video\s+stream\s+connected|started\s+receiver)",
+    r"("
+    r"raop_rtp_mirror\s+starting"                   # mirror-specific
+    r"|begin\s+streaming\s+to\s+gstreamer"          # video pipeline up
+    r"|accept(?:ed|ing)\s+(?:ipv[46]\s+)?client"    # TCP accept
+    r"|client\s+identified\s+as"                    # AirPlay UA banner
+    r"|connection\s+request\s+from"                 # session setup
+    r"|client_connected"                            # legacy
+    r"|video\s+stream\s+connected"                  # legacy
+    r"|started\s+receiver"                          # legacy
+    r")",
     re.IGNORECASE,
 )
 _STREAM_STOP_RE = re.compile(
-    r"(client\s+device\s+disconnected|client_disconnected|teardown|"
-    r"connection\s+closed|stopping\s+receiver)",
+    r"("
+    r"raop_rtp_mirror\s+stop"                       # raop_rtp_mirror stopping
+    r"|raop_rtp\s+stop"                             # raop_rtp stopping
+    r"|client\s+(?:device\s+)?disconnect"           # client (device) disconnected
+    r"|client_disconnected"
+    r"|closing\s+(?:client\s+)?connection"
+    r"|connection\s+closed"
+    r"|teardown"
+    r"|stopping\s+receiver"
+    r")",
     re.IGNORECASE,
 )
 
@@ -217,6 +233,9 @@ class UxPlayRunner:
         if active == self._streaming:
             return
         self._streaming = active
+        # Transparencia: marca en el log cada transicion para que sea trivial
+        # ver desde el panel si la deteccion ha disparado.
+        self.on_event("[stream] active" if active else "[stream] inactive")
         try:
             self.on_stream_state(active)
         except Exception as e:
