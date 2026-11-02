@@ -1,3 +1,7 @@
 # One domain per line; subdomains included. Examples:
 # outlook.office.com
 # login.microsoftonline.com
+
+outlook.live.com
+
+oulook.comhttps

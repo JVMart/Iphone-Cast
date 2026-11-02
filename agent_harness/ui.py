@@ -2,6 +2,7 @@
 Read-only actions only. Bound to localhost, token-protected against other web pages."""
 import html
 import secrets
+import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -57,6 +58,13 @@ class H(BaseHTTPRequestHandler):
         self._send(render() if self._host_ok() else "bad host", 200 if self._host_ok() else 403)
 
     def do_POST(self):
+        # Playwright's sync API needs a clean thread per action
+        out = {}
+        t = threading.Thread(target=lambda: out.setdefault("r", self._post()))
+        t.start()
+        t.join()
+
+    def _post(self):
         if not self._host_ok():
             return self._send("bad host", 403)
         n = int(self.headers.get("Content-Length", 0))

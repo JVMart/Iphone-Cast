@@ -34,8 +34,12 @@ class Session:
         self.confirm = confirm
         self._pw = sync_playwright().start()
         PROFILE.mkdir(parents=True, exist_ok=True)
-        self.ctx = self._pw.chromium.launch_persistent_context(
-            str(PROFILE), headless=headless)
+        try:
+            self.ctx = self._pw.chromium.launch_persistent_context(
+                str(PROFILE), headless=headless)
+        except Exception:
+            self._pw.stop()
+            raise
         self.page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
 
     def close(self):
