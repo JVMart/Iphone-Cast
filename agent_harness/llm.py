@@ -18,12 +18,30 @@ class LLMError(Exception):
     pass
 
 
-def ollama_up():
+PREFERRED = ["llama3.1:8b", "ministral-3:8b", "qwen3.5:9b", "gemma4:e4b", "hermes3:8b", "phi4:14b"]
+
+
+def ollama_models():
     try:
-        urllib.request.urlopen(OLLAMA + "/api/tags", timeout=0.7).close()
-        return True
+        with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=1) as r:
+            return [m["name"] for m in json.load(r)["models"]]
     except Exception:
-        return False
+        return []
+
+
+def ollama_model():
+    """HARNESS_OLLAMA_MODEL if set, else a preferred installed model, else the first one."""
+    if os.environ.get("HARNESS_OLLAMA_MODEL"):
+        return os.environ["HARNESS_OLLAMA_MODEL"]
+    have = ollama_models()
+    for m in PREFERRED:
+        if m in have:
+            return m
+    return have[0] if have else "llama3.1"
+
+
+def ollama_up():
+    return bool(ollama_models())
 
 
 def openai_configured():
@@ -53,8 +71,9 @@ def _post(url, body, headers):
 def complete(system, user, backend):
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if backend == "ollama":
-        model = os.environ.get("HARNESS_OLLAMA_MODEL", "llama3.1")
-        data = _post(OLLAMA + "/api/chat", {"model": model, "stream": False, "messages": messages}, {})
+        model = ollama_model()
+        data = _post(OLLAMA + "/api/chat", {"model": model, "stream": False, "messages": messages,
+                                            "options": {"num_ctx": 16384}}, {})
         return data["message"]["content"]
     if backend == "openai":
         if not openai_configured():
