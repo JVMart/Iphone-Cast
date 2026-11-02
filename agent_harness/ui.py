@@ -4,6 +4,7 @@ import email
 import email.policy
 import html
 import json
+import os
 import re
 import secrets
 import threading
@@ -224,7 +225,12 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _host_ok(self):
-        return self.headers.get("Host", "") in (f"127.0.0.1:{PORT}", f"localhost:{PORT}")
+        host = self.headers.get("Host", "")
+        if host in (f"127.0.0.1:{PORT}", f"localhost:{PORT}"):
+            return True
+        # Private Tailscale access: set HARNESS_TAILNET_HOST to your machine's .ts.net name.
+        extra = os.environ.get("HARNESS_TAILNET_HOST", "").strip().lower()
+        return bool(extra) and host.lower() == extra
 
     def do_GET(self):
         if not self._host_ok():
