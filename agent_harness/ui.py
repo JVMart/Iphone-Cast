@@ -1,13 +1,15 @@
 """Local UI: python -m agent_harness.ui  ->  http://127.0.0.1:8765
 Read-only actions only. Bound to localhost, token-protected against other web pages."""
 import html
+import json
 import secrets
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .harness import CONFIG, Session, allowed_domains
+from .harness import CONFIG, HOME, Session, allowed_domains
 
 PORT = 8765
 TOKEN = secrets.token_urlsafe(24)
@@ -18,30 +20,106 @@ APPS = {
     "Custom": "",
 }
 
+HISTORY = HOME / "history.jsonl"
+MAX_HISTORY = 50
+
 PAGE = """<!doctype html><meta charset=utf-8><title>Agent harness</title>
-<style>body{{font:15px system-ui;max-width:820px;margin:2rem auto;padding:0 1rem}}
-input,select,button{{font:inherit;padding:.4rem;margin:.2rem 0}}input[type=text]{{width:100%}}
-pre{{background:#f4f4f4;padding:1rem;white-space:pre-wrap;max-height:50vh;overflow:auto}}</style>
-<h2>Agent browser-session harness</h2>
-<form method=post>
+<style>
+*{{box-sizing:border-box}}
+body{{font:15px system-ui,sans-serif;margin:0;color:#1d1b2e;min-height:100vh;
+background:linear-gradient(135deg,#ffe3f1,#e0e7ff 45%,#d6f5ec)}}
+main{{max-width:900px;margin:0 auto;padding:1.5rem 1rem 4rem}}
+h1{{margin:.2rem 0 1rem;font-size:1.7rem;background:linear-gradient(90deg,#7c3aed,#ec4899,#f59e0b);
+-webkit-background-clip:text;background-clip:text;color:transparent}}
+h2{{margin:2rem 0 .6rem;font-size:1.1rem}}
+.panel{{background:#fff;border-radius:16px;padding:1.2rem;box-shadow:0 6px 24px #7c3aed22}}
+label{{display:block;font-weight:600;margin:.5rem 0 .2rem}}
+input[type=text],select{{width:100%;font:inherit;padding:.55rem .7rem;border:2px solid #e5e7f5;border-radius:10px}}
+input:focus,select:focus{{outline:none;border-color:#a78bfa}}
+.btns{{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}}
+button{{font:inherit;font-weight:600;border:0;color:#fff;padding:.6rem 1.1rem;border-radius:999px;
+cursor:pointer;transition:transform .12s,box-shadow .12s}}
+button:hover{{transform:translateY(-2px);box-shadow:0 6px 14px #0003}}
+.login{{background:linear-gradient(90deg,#7c3aed,#a855f7)}}
+.read{{background:linear-gradient(90deg,#ec4899,#f97316)}}
+.allow{{background:linear-gradient(90deg,#10b981,#06b6d4)}}
+.chips span{{display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:999px;padding:.15rem .7rem;margin:.15rem;font-size:.85rem}}
+.msg{{margin:1rem 0;padding:.7rem 1rem;border-radius:12px;background:#fef3c7;font-weight:600}}
+.cards{{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1rem}}
+.card{{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px #0001;
+border-top:6px solid hsl(var(--h) 80% 55%);transition:transform .15s}}
+.card:hover{{transform:translateY(-3px)}}
+.card summary{{list-style:none;cursor:pointer;padding:.9rem 1rem;
+background:linear-gradient(160deg,hsl(var(--h) 90% 96%),#fff)}}
+.card summary::-webkit-details-marker{{display:none}}
+.host{{font-weight:700;color:hsl(var(--h) 60% 35%)}}
+.when{{font-size:.8rem;color:#6b7280}}
+.snip{{font-size:.85rem;color:#374151;margin-top:.4rem;display:-webkit-box;-webkit-line-clamp:3;
+-webkit-box-orient:vertical;overflow:hidden}}
+.card[open]{{grid-column:1/-1}}
+.card pre{{margin:0;padding:1rem;white-space:pre-wrap;max-height:50vh;overflow:auto;
+background:hsl(var(--h) 40% 98%);border-top:1px dashed hsl(var(--h) 60% 80%)}}
+.empty{{color:#6b7280}}
+</style>
+<main>
+<h1>Agent browser-session harness</h1>
+<form method=post class=panel>
 <input type=hidden name=token value="{token}">
-<label>App <select name=app onchange="u.value=this.value">{apps}</select></label>
-<label>URL<input type=text id=u name=url value="{url}" required></label>
-<label>CSS selector (read) <input type=text name=selector value="body"></label>
-<button name=action value=login>1. Log in (opens browser)</button>
-<button name=action value=read>2. Read page</button>
-<button name=action value=allow>Allow this domain</button>
+<label>App</label><select name=app onchange="u.value=this.value">{apps}</select>
+<label>URL</label><input type=text id=u name=url value="{url}" required>
+<label>CSS selector (read)</label><input type=text name=selector value="body">
+<div class=btns>
+<button class=login name=action value=login>1. Log in (opens browser)</button>
+<button class=read name=action value=read>2. Read page</button>
+<button class=allow name=action value=allow>Allow this domain</button>
+</div>
+<p class=chips>Allowed: {allowed}</p>
 </form>
-<p>Allowed: {allowed}</p>
-<p><b>{msg}</b></p>{out}"""
+{msg}{out}
+<h2>History</h2>
+<div class=cards>{cards}</div>
+</main>"""
+
+
+def _hue(host):
+    return sum(ord(c) * (i + 7) for i, c in enumerate(host)) % 360
+
+
+def save_history(url, text):
+    HOME.mkdir(parents=True, exist_ok=True)
+    rows = load_history()
+    rows.append({"t": time.time(), "url": url, "text": text[:20000]})
+    HISTORY.write_text("\n".join(json.dumps(r) for r in rows[-MAX_HISTORY:]) + "\n",
+                       encoding="utf-8")
+
+
+def load_history():
+    if not HISTORY.exists():
+        return []
+    return [json.loads(l) for l in HISTORY.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
+def cards_html():
+    cards = []
+    for r in reversed(load_history()):
+        host = urlparse(r["url"]).hostname or "?"
+        when = time.strftime("%b %d, %I:%M %p", time.localtime(r["t"]))
+        snip = " ".join(r["text"].split())[:200] or "(empty page - not signed in?)"
+        cards.append(
+            f'<details class=card style="--h:{_hue(host)}"><summary>'
+            f'<div class=host>{html.escape(host)}</div><div class=when>{when}</div>'
+            f'<div class=snip>{html.escape(snip)}</div></summary>'
+            f'<pre>{html.escape(r["text"])}</pre></details>')
+    return "".join(cards) or '<p class=empty>No reads yet. Your past reads will show up here as cards.</p>'
 
 
 def render(msg="", out="", url=""):
     apps = "".join(f'<option value="{html.escape(v)}">{html.escape(k)}</option>'
                    for k, v in APPS.items())
-    return PAGE.format(token=TOKEN, apps=apps, url=html.escape(url),
-                       allowed=html.escape(", ".join(sorted(allowed_domains())) or "none"),
-                       msg=html.escape(msg), out=f"<pre>{html.escape(out)}</pre>" if out else "")
+    chips = "".join(f"<span>{html.escape(d)}</span>" for d in sorted(allowed_domains())) or "none"
+    return PAGE.format(token=TOKEN, apps=apps, url=html.escape(url), allowed=chips,
+                       msg=f"<div class=msg>{html.escape(msg)}</div>" if msg else "",
+                       out="", cards=cards_html())
 
 
 class H(BaseHTTPRequestHandler):
@@ -98,7 +176,8 @@ class H(BaseHTTPRequestHandler):
                 text = s.read_text(f.get("selector") or "body")
             finally:
                 s.close()
-            self._send(render("Page text:", text[:20000], url))
+            save_history(url, text)
+            self._send(render("Saved to history below.", url=url))
         except Exception as e:
             self._send(render(f"Error: {e}", url=url))
 
