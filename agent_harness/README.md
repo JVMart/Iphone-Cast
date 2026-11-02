@@ -13,3 +13,5 @@ Safety:
 - Domain allowlist; read-only unless `--allow-write`, and each write needs a y/N confirm.
 - Every action is logged to `audit.jsonl`.
 - Only works within your own permissions. Check your employer's policy on automating work accounts first.
+
+Local UI: python -m agent_harness.ui (opens http://127.0.0.1:8765; read-only; pick app/URL, Allow domain, Log in, Read).
