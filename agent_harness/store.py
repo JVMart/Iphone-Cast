@@ -46,14 +46,25 @@ def add(source, title, url, text, tag="work"):
         return cur.lastrowid, True
 
 
-def list_docs(tag=None, limit=200):
+def list_docs(tag=None, limit=200, source=None, q=None):
+    if q and q.strip():
+        docs = search(q, limit)
+    else:
+        with conn() as c:
+            docs = [dict(r) for r in c.execute(
+                "SELECT * FROM documents ORDER BY added DESC LIMIT ?", (limit,))]
+    return [d for d in docs if (not tag or d["tag"] == tag) and (not source or d["source"] == source)]
+
+
+def sources():
     with conn() as c:
-        if tag:
-            rows = c.execute("SELECT * FROM documents WHERE tag=? ORDER BY added DESC LIMIT ?",
-                             (tag, limit))
-        else:
-            rows = c.execute("SELECT * FROM documents ORDER BY added DESC LIMIT ?", (limit,))
-        return [dict(r) for r in rows]
+        return [r[0] for r in c.execute("SELECT DISTINCT source FROM documents ORDER BY source")]
+
+
+def retag(doc_id, tag):
+    with conn() as c:
+        c.execute("UPDATE documents SET tag=? WHERE id=?",
+                  ((tag or "note").strip().lower()[:40], int(doc_id)))
 
 
 def get(ids):
@@ -128,7 +139,10 @@ def save_run(agent, doc_ids, backend, question, output):
                   (time.time(), agent, json.dumps(list(doc_ids)), backend, question, output))
 
 
-def list_runs(limit=20):
+def list_runs(limit=20, agent=None, q=None):
     with conn() as c:
-        return [dict(r) for r in c.execute(
-            "SELECT * FROM runs ORDER BY t DESC LIMIT ?", (limit,))]
+        rows = [dict(r) for r in c.execute("SELECT * FROM runs ORDER BY t DESC LIMIT 500")]
+    ql = (q or "").lower().strip()
+    rows = [r for r in rows if (not agent or r["agent"] == agent)
+            and (not ql or ql in (r["output"] + " " + (r["question"] or "")).lower())]
+    return rows[:limit]
